@@ -1,0 +1,6 @@
+{
+  "name": "Excel Shortcut 9:16 Reel Generator",
+  "description": "Video edukasi vertikal 9:16 shortcut Microsoft Excel interaktif dengan animasi keyboard realistis dan efek satisfying untuk Reels, TikTok, dan Shorts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
