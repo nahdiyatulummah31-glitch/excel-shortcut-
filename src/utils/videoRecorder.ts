@@ -3,24 +3,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { toCanvas } from 'html-to-image';
 import { ShortcutScenario, ShortcutStep } from '../types/shortcuts';
 import { soundFx } from './soundEffects';
 import { getDefaultVoiceScript, playVoiceNarration } from './voiceOver';
 
 /**
- * High-performance 9:16 vertical video renderer and recorder using HTML5 Canvas,
- * Web Audio Destination, and MediaRecorder.
- * Generates genuine 720x1280 (9:16) MP4 video clips with synchronized female voiceover
- * and mechanical keyboard sound effects ready for Reels, TikTok, and YouTube Shorts.
+ * High-fidelity 9:16 vertical video recorder.
+ * Can capture the live DOM element directly (100% SAMA PLEK with screen preview)
+ * or render using ultra-high-definition canvas fallback.
+ * Produces genuine MP4 files with integrated female voice narration and mechanical keyboard audio.
  */
 export async function recordShortcutVideo(
   scenario: ShortcutScenario,
   isDarkTheme: boolean = true,
-  onProgress: (percent: number) => void
+  onProgress: (percent: number) => void,
+  targetElement?: HTMLElement | null
 ): Promise<Blob> {
   const canvas = document.createElement('canvas');
   canvas.width = 720;
-  canvas.height = 1280; // 9:16 aspect ratio
+  canvas.height = 1280; // Standard 9:16 vertical HD resolution
   const ctx = canvas.getContext('2d', { alpha: false });
 
   if (!ctx) {
@@ -28,13 +30,13 @@ export async function recordShortcutVideo(
   }
 
   // Pre-fill canvas
-  ctx.fillStyle = isDarkTheme ? '#18181b' : '#ffffff';
+  ctx.fillStyle = isDarkTheme ? '#18181b' : '#f3f3f3';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const fps = 30; // 30 FPS for reliable, smooth capture across all devices
+  const fps = 30; // 30 FPS for smooth video playback
   const stream = canvas.captureStream(fps);
 
-  // Set up Web Audio pipeline to capture both keyboard sounds and female voiceover into the video
+  // Set up Web Audio pipeline to capture keyboard sounds & female voice into the MP4 file
   let audioCtx: AudioContext | null = null;
   let audioDest: MediaStreamAudioDestinationNode | null = null;
 
@@ -75,7 +77,7 @@ export async function recordShortcutVideo(
   try {
     mediaRecorder = new MediaRecorder(stream, {
       mimeType: chosenMime,
-      videoBitsPerSecond: 6000000,
+      videoBitsPerSecond: 8000000, // 8 Mbps high-quality video bitrate
     });
   } catch {
     try {
@@ -126,7 +128,7 @@ export async function recordShortcutVideo(
     let currentFrame = 0;
     let lastStepIndex = -1;
 
-    const timer = setInterval(() => {
+    const timer = setInterval(async () => {
       const currentTimeMs = (currentFrame / totalFrames) * totalDurationMs;
       onProgress(Math.min(99, Math.round((currentFrame / totalFrames) * 100)));
 
@@ -149,8 +151,25 @@ export async function recordShortcutVideo(
         else if (step.sound === 'whoosh') soundFx.playWhoosh();
       }
 
-      // Draw 9:16 Frame
-      drawExcelCanvas(ctx, canvas.width, canvas.height, scenario, step, currentTimeMs, isDarkTheme, voiceScript);
+      // 1. If targetElement is provided, capture exact DOM for 100% SAMA PLEK quality!
+      let capturedViaDom = false;
+      if (targetElement) {
+        try {
+          const domCanvas = await toCanvas(targetElement, {
+            pixelRatio: 1.5,
+            cacheBust: false,
+          });
+          ctx.drawImage(domCanvas, 0, 0, canvas.width, canvas.height);
+          capturedViaDom = true;
+        } catch {
+          capturedViaDom = false;
+        }
+      }
+
+      // 2. High-fidelity canvas fallback (WITHOUT any subtitle pill on screen!)
+      if (!capturedViaDom) {
+        drawPureExcelCanvas(ctx, canvas.width, canvas.height, scenario, step, currentTimeMs, isDarkTheme);
+      }
 
       currentFrame++;
       if (currentFrame > totalFrames) {
@@ -171,102 +190,183 @@ export async function recordShortcutVideo(
   });
 }
 
-function drawExcelCanvas(
+/**
+ * High-fidelity Excel renderer without any floating subtitles / pills on screen.
+ * Focuses purely on authentic Excel 365 window, formula bar, grid, and 3D mechanical keys.
+ */
+function drawPureExcelCanvas(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
   scenario: ShortcutScenario,
   step: ShortcutStep,
   currentTimeMs: number,
-  isDarkTheme: boolean,
-  voiceScript: string
+  isDarkTheme: boolean
 ) {
-  // Clear
+  // Clear background
   ctx.fillStyle = isDarkTheme ? '#18181b' : '#f3f3f3';
   ctx.fillRect(0, 0, width, height);
 
-  // 1. TOP EXCEL TITLE BAR
+  // 1. TOP EXCEL TITLE BAR (Authentic Excel 365)
   ctx.fillStyle = '#107c41'; // Authentic Excel Ribbon Green
-  ctx.fillRect(0, 0, width, 55);
+  ctx.fillRect(0, 0, width, 52);
+
+  // AutoSave pill
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+  ctx.beginPath();
+  ctx.roundRect(14, 12, 110, 28, 14);
+  ctx.fill();
 
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 18px "Segoe UI", sans-serif';
-  ctx.fillText('AutoSave • Laporan_Penjualan_2026.xlsx - Excel', 20, 34);
+  ctx.font = 'bold 12px "Segoe UI", sans-serif';
+  ctx.fillText('AutoSave • ON', 26, 30);
 
-  // 2. EXCEL MENU TABS
+  // Title
+  ctx.font = 'bold 14px "Segoe UI", sans-serif';
+  ctx.fillText('Laporan_Keuangan_2026.xlsx - Excel', 140, 31);
+
+  // Window buttons (- [ ] X)
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+  ctx.font = '14px "Segoe UI"';
+  ctx.fillText('—  ▢  ✕', width - 75, 31);
+
+  // 2. EXCEL MENU TABS (File, Home, Insert, Page Layout, Formulas, Data, Review, View)
   ctx.fillStyle = isDarkTheme ? '#202023' : '#e6e6e6';
-  ctx.fillRect(0, 55, width, 42);
+  ctx.fillRect(0, 52, width, 38);
 
-  const tabs = ['File', 'Home', 'Insert', 'Page Layout', 'Formulas', 'Data'];
-  let tabX = 20;
+  const tabs = ['File', 'Home', 'Insert', 'Page Layout', 'Formulas', 'Data', 'Review', 'View'];
+  let tabX = 14;
   tabs.forEach((tab, i) => {
-    ctx.font = i === 1 ? 'bold 15px "Segoe UI"' : '14px "Segoe UI"';
+    ctx.font = i === 1 ? 'bold 13px "Segoe UI"' : '12px "Segoe UI"';
     ctx.fillStyle = i === 1 ? (isDarkTheme ? '#10b981' : '#107c41') : (isDarkTheme ? '#a1a1aa' : '#555555');
-    ctx.fillText(tab, tabX, 81);
+    ctx.fillText(tab, tabX, 76);
     if (i === 1) {
       // Tab underline indicator
       ctx.fillStyle = isDarkTheme ? '#10b981' : '#107c41';
-      ctx.fillRect(tabX - 4, 94, ctx.measureText(tab).width + 8, 3);
+      ctx.fillRect(tabX - 2, 87, ctx.measureText(tab).width + 4, 3);
     }
-    tabX += 80;
+    tabX += ctx.measureText(tab).width + 16;
   });
 
-  // 3. SUBTITLE / FEMALE NARRATION CAPTION (Reels / TikTok Style)
-  const capY = 104;
-  ctx.fillStyle = isDarkTheme ? 'rgba(24, 24, 27, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+  // 3. RIBBON ACTION BAR (Compact Excel Toolbar)
+  const ribbonY = 90;
+  ctx.fillStyle = isDarkTheme ? '#27272a' : '#f8fafc';
+  ctx.fillRect(0, ribbonY, width, 52);
+  ctx.strokeStyle = isDarkTheme ? '#3f3f46' : '#e2e8f0';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0, ribbonY, width, 52);
+
+  // Font family dropdown
+  ctx.fillStyle = isDarkTheme ? '#18181b' : '#ffffff';
   ctx.beginPath();
-  ctx.roundRect(14, capY, width - 28, 48, 12);
+  ctx.roundRect(14, ribbonY + 10, 110, 32, 6);
   ctx.fill();
-  ctx.strokeStyle = '#10b981';
-  ctx.lineWidth = 1.5;
   ctx.stroke();
-
-  // Waveform bars icon
-  ctx.fillStyle = '#10b981';
-  ctx.font = 'bold 13px "Segoe UI", sans-serif';
-  ctx.fillText('🎙️ SUARA KALEM:', 26, capY + 30);
-
   ctx.fillStyle = isDarkTheme ? '#f4f4f5' : '#1e293b';
-  ctx.font = '500 13px "Segoe UI", sans-serif';
-  const cleanScript = voiceScript.length > 56 ? voiceScript.substring(0, 54) + '...' : voiceScript;
-  ctx.fillText(`"${cleanScript}"`, 146, capY + 30);
+  ctx.font = '500 12px "Segoe UI"';
+  ctx.fillText('Aptos Display ▾', 24, ribbonY + 30);
+
+  // Font size
+  ctx.beginPath();
+  ctx.roundRect(132, ribbonY + 10, 48, 32, 6);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillText('11 ▾', 142, ribbonY + 30);
+
+  // B I U buttons
+  const isBoldActive = step.cellFormattingDelta?.[`${step.activeCell.col}${step.activeCell.row}`]?.bold;
+  const isItalicActive = step.cellFormattingDelta?.[`${step.activeCell.col}${step.activeCell.row}`]?.italic;
+
+  // Bold button
+  ctx.fillStyle = isBoldActive ? '#107c41' : (isDarkTheme ? '#3f3f46' : '#e2e8f0');
+  ctx.beginPath();
+  ctx.roundRect(190, ribbonY + 10, 32, 32, 6);
+  ctx.fill();
+  ctx.fillStyle = isBoldActive ? '#ffffff' : (isDarkTheme ? '#f4f4f5' : '#1e293b');
+  ctx.font = 'bold 14px "Segoe UI"';
+  ctx.fillText('B', 201, ribbonY + 31);
+
+  // Italic button
+  ctx.fillStyle = isItalicActive ? '#107c41' : (isDarkTheme ? '#3f3f46' : '#e2e8f0');
+  ctx.beginPath();
+  ctx.roundRect(228, ribbonY + 10, 32, 32, 6);
+  ctx.fill();
+  ctx.fillStyle = isItalicActive ? '#ffffff' : (isDarkTheme ? '#f4f4f5' : '#1e293b');
+  ctx.font = 'italic 14px "Segoe UI"';
+  ctx.fillText('I', 240, ribbonY + 31);
+
+  // Underline button
+  ctx.fillStyle = isDarkTheme ? '#3f3f46' : '#e2e8f0';
+  ctx.beginPath();
+  ctx.roundRect(266, ribbonY + 10, 32, 32, 6);
+  ctx.fill();
+  ctx.fillStyle = isDarkTheme ? '#f4f4f5' : '#1e293b';
+  ctx.font = '14px "Segoe UI"';
+  ctx.fillText('U̲', 276, ribbonY + 31);
+
+  // Number format badges (Rp, %, 0.00)
+  ctx.fillStyle = isDarkTheme ? '#18181b' : '#ffffff';
+  ctx.beginPath();
+  ctx.roundRect(310, ribbonY + 10, 42, 32, 6);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#10b981';
+  ctx.font = 'bold 12px "Segoe UI"';
+  ctx.fillText('Rp', 322, ribbonY + 30);
+
+  ctx.beginPath();
+  ctx.roundRect(360, ribbonY + 10, 36, 32, 6);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = isDarkTheme ? '#f4f4f5' : '#1e293b';
+  ctx.font = 'bold 13px "Segoe UI"';
+  ctx.fillText('%', 372, ribbonY + 31);
 
   // 4. FORMULA BAR
-  const formulaY = 158;
-  ctx.fillStyle = isDarkTheme ? '#27272a' : '#f0f0f0';
+  const formulaY = 146;
+  ctx.fillStyle = isDarkTheme ? '#202024' : '#f1f5f9';
   ctx.fillRect(0, formulaY, width, 40);
+  ctx.strokeStyle = isDarkTheme ? '#2e2e33' : '#cbd5e1';
+  ctx.strokeRect(0, formulaY, width, 40);
 
-  // Name Box
+  // Name Box (B3, A1, etc.)
   ctx.fillStyle = isDarkTheme ? '#18181b' : '#ffffff';
-  ctx.fillRect(10, formulaY + 6, 80, 28);
-  ctx.strokeStyle = isDarkTheme ? '#3f3f46' : '#d4d4d4';
-  ctx.strokeRect(10, formulaY + 6, 80, 28);
+  ctx.beginPath();
+  ctx.roundRect(14, formulaY + 6, 85, 28, 6);
+  ctx.fill();
+  ctx.strokeStyle = isDarkTheme ? '#10b981' : '#107c41';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.lineWidth = 1;
 
   ctx.fillStyle = isDarkTheme ? '#ffffff' : '#000000';
-  ctx.font = 'bold 14px "Segoe UI"';
-  ctx.fillText(`${step.activeCell.col}${step.activeCell.row}`, 34, formulaY + 25);
+  ctx.font = 'bold 13px "Segoe UI"';
+  ctx.fillText(`${step.activeCell.col}${step.activeCell.row}`, 42, formulaY + 24);
 
   // fx icon
   ctx.fillStyle = '#107c41';
   ctx.font = 'italic bold 15px "Segoe UI"';
-  ctx.fillText('fx', 105, formulaY + 25);
+  ctx.fillText('fx', 114, formulaY + 25);
 
   // Formula input area
   ctx.fillStyle = isDarkTheme ? '#18181b' : '#ffffff';
-  ctx.fillRect(130, formulaY + 6, width - 145, 28);
-  ctx.strokeRect(130, formulaY + 6, width - 145, 28);
+  ctx.beginPath();
+  ctx.roundRect(140, formulaY + 6, width - 154, 28, 6);
+  ctx.fill();
+  ctx.strokeStyle = isDarkTheme ? '#3f3f46' : '#cbd5e1';
+  ctx.stroke();
 
   const activeCoord = `${step.activeCell.col}${step.activeCell.row}`;
   let formulaValue = scenario.defaultData[activeCoord] || '';
   if (step.sheetDataDelta && step.sheetDataDelta[activeCoord] !== undefined) {
     formulaValue = step.sheetDataDelta[activeCoord];
   }
-  ctx.fillStyle = isDarkTheme ? '#d4d4d8' : '#333333';
-  ctx.font = '14px "Segoe UI"';
-  ctx.fillText(formulaValue, 142, formulaY + 25);
+  ctx.fillStyle = isDarkTheme ? '#f4f4f5' : '#1e293b';
+  ctx.font = '13px "Segoe UI"';
+  ctx.fillText(formulaValue, 152, formulaY + 24);
 
   // 5. SPREADSHEET GRID
-  const startGridY = 205;
+  const startGridY = 192;
   const colWidth = 120;
   const rowHeight = 44;
 
@@ -285,12 +385,14 @@ function drawExcelCanvas(
     ctx.strokeRect(70 + idx * colWidth, startGridY, colWidth, rowHeight);
 
     ctx.fillStyle = isColActive ? '#ffffff' : (isDarkTheme ? '#a1a1aa' : '#444444');
-    ctx.font = 'bold 18px "Segoe UI"';
+    ctx.font = 'bold 16px "Segoe UI"';
     ctx.fillText(col, 70 + idx * colWidth + colWidth / 2 - 8, startGridY + 28);
   });
 
-  // Rows 1, 2, 3, 4, 5...
+  // Rows 1, 2, 3, 4, 5, 6, 7, 8...
   scenario.rows.forEach((row, rIdx) => {
+    if (step.hiddenRows?.includes(row)) return;
+
     const rowY = startGridY + (rIdx + 1) * rowHeight;
     const isRowActive = step.activeCell.row === row;
 
@@ -301,24 +403,38 @@ function drawExcelCanvas(
     ctx.strokeRect(0, rowY, 70, rowHeight);
 
     ctx.fillStyle = isRowActive ? '#ffffff' : (isDarkTheme ? '#a1a1aa' : '#444444');
-    ctx.font = 'bold 18px "Segoe UI"';
+    ctx.font = 'bold 16px "Segoe UI"';
     ctx.fillText(String(row), 25, rowY + 28);
 
     // Cells
     scenario.columns.forEach((col, cIdx) => {
+      if (step.hiddenCols?.includes(col)) return;
+
       const cellX = 70 + cIdx * colWidth;
       const cCoord = `${col}${row}`;
       const isActive = step.activeCell.col === col && step.activeCell.row === row;
       const isCopied = step.copiedCell && step.copiedCell.col === col && step.copiedCell.row === row;
-      
+
+      // Range check
+      let isInRange = false;
+      if (step.selectedRange) {
+        const { startCol, startRow, endCol, endRow } = step.selectedRange;
+        const colCode = col.charCodeAt(0);
+        const sColCode = startCol.charCodeAt(0);
+        const eColCode = endCol.charCodeAt(0);
+        if (colCode >= sColCode && colCode <= eColCode && row >= startRow && row <= endRow) {
+          isInRange = true;
+        }
+      }
+
       let text = scenario.defaultData[cCoord] || '';
       if (step.sheetDataDelta && step.sheetDataDelta[cCoord] !== undefined) {
         text = step.sheetDataDelta[cCoord];
       }
 
       ctx.fillStyle = isDarkTheme 
-        ? (row === 1 ? '#222226' : '#18181b')
-        : (row === 1 ? '#f8fafc' : '#ffffff');
+        ? (row === 1 ? '#222226' : (isInRange ? '#064e3b' : '#18181b'))
+        : (row === 1 ? '#f8fafc' : (isInRange ? '#d1fae5' : '#ffffff'));
       ctx.fillRect(cellX, rowY, colWidth, rowHeight);
 
       ctx.strokeStyle = isDarkTheme ? '#27272a' : '#e2e2e2';
@@ -326,10 +442,12 @@ function drawExcelCanvas(
       ctx.strokeRect(cellX, rowY, colWidth, rowHeight);
 
       // Render Text
+      const isCellBold = row === 1 || step.cellFormattingDelta?.[cCoord]?.bold;
+      const isCellItalic = step.cellFormattingDelta?.[cCoord]?.italic;
       ctx.fillStyle = isDarkTheme
         ? (row === 1 ? '#ffffff' : '#e4e4e7')
         : (row === 1 ? '#000000' : '#1e293b');
-      ctx.font = row === 1 ? 'bold 16px "Segoe UI"' : '15px "Segoe UI"';
+      ctx.font = `${isCellItalic ? 'italic ' : ''}${isCellBold ? 'bold ' : ''}15px "Segoe UI"`;
       ctx.fillText(text, cellX + 10, rowY + 28);
 
       // Active cell green box
@@ -358,7 +476,7 @@ function drawExcelCanvas(
   });
 
   // 6. FLOATING GLASSMORPHISM KEYBOARD CAPSULE (Matching reference image: ineffblgrl on Threads.png)
-  const kbY = height - 250;
+  const kbY = height - 240;
 
   // Banner Action Title
   ctx.fillStyle = isDarkTheme ? 'rgba(15, 23, 42, 0.94)' : 'rgba(255, 255, 255, 0.95)';

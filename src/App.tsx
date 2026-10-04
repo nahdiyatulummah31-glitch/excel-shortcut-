@@ -47,6 +47,9 @@ export default function App() {
   // Dark mode Excel theme (matching the user's reference image with dark charcoal grid and glass capsule)
   const [isDarkTheme, setIsDarkTheme] = useState<boolean>(true);
 
+  // Screen reference for high-fidelity DOM video recording (100% sama plek)
+  const screenRef = useRef<HTMLDivElement>(null);
+
   // Playback state
   const [currentTimeMs, setCurrentTimeMs] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
@@ -306,9 +309,14 @@ export default function App() {
     setDownloadUrl(null);
 
     try {
-      const videoBlob = await recordShortcutVideo(currentScenario, isDarkTheme, (percent) => {
-        setRecordingProgress(percent);
-      });
+      const videoBlob = await recordShortcutVideo(
+        currentScenario, 
+        isDarkTheme, 
+        (percent) => {
+          setRecordingProgress(percent);
+        },
+        screenRef.current
+      );
       const url = URL.createObjectURL(videoBlob);
       setDownloadUrl(url);
 
@@ -436,38 +444,14 @@ export default function App() {
 
           {/* B. THE 9:16 VERTICAL REEL FRAME */}
           <div
+            ref={screenRef}
+            id="excel-vertical-screen"
             className={`relative flex flex-col bg-white overflow-hidden shadow-2xl transition-all duration-300 w-full ${
               isFullScreenMode
                 ? 'h-full max-w-[56.25vh] aspect-[9/16]' // Perfectly fills full screen in 9:16 ratio
                 : 'aspect-[9/16] rounded-3xl border-4 border-neutral-800 ring-1 ring-neutral-700'
             }`}
           >
-            {/* LIVE FEMALE VOICEOVER SUBTITLES PILL (TikTok/Reels style) */}
-            {isVoiceOverEnabled && (
-              <div className="absolute top-12 left-2.5 right-2.5 z-40 bg-neutral-950/85 backdrop-blur-md border border-emerald-500/50 rounded-xl px-2.5 py-1.5 flex items-center gap-2 shadow-lg animate-in fade-in duration-200">
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${isVoiceSpeaking ? 'bg-emerald-500 text-black animate-pulse' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                  <Mic size={11} />
-                </div>
-                <div className="flex-1 min-w-0 flex items-center justify-between gap-1">
-                  <div className="min-w-0">
-                    <span className="text-[10px] font-bold text-emerald-400 mr-1.5">
-                      Suara Cewek:
-                    </span>
-                    <span className="text-[11px] text-neutral-200 font-medium truncate">
-                      "{activeVoiceScript}"
-                    </span>
-                  </div>
-                  {isVoiceSpeaking && (
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      <span className="w-1 h-3 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-1 h-4 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-1 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* SPREADSHEET CANVAS */}
             <div className="flex-1 w-full relative overflow-hidden flex flex-col">
               <ExcelWorksheet
